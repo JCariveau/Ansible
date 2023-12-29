@@ -1,0 +1,169 @@
+
+Archived entries from file /home/arensb/proj/ansible/collections/truenas/TODO.org
+
+
+* CANCELLED Bug report: chown before setting uid
+CLOSED: [2023-06-01 Thu 12:51]
+:PROPERTIES:
+:ARCHIVE_TIME: 2023-07-17 Mon 10:00
+:ARCHIVE_FILE: ~/proj/ansible/collections/truenas/TODO.org
+:ARCHIVE_CATEGORY: TODO
+:ARCHIVE_TODO: CANCELLED
+:END:
+:LOGBOOK:
+- State "WAITING"    from "TODO"       [2023-03-12 Sun 17:13] \\
+  Ixsystems to fix bug.
+:END:
+Ticket: [[https://ixsystems.atlassian.net/browse/NAS-120973][NAS-120973]]
+
+Error when creating a user with a home directory but without specified uid.
+
+It looks as though that's a chown, but the immediate error appears to be that =data['uid']= fails because there's no =uid= key.
+
+#+begin_src fundamental
+  > midclt call user.create '{"username": "arnie", "full_name": "Arnie", "password": "*", "home": "/mnt/pool0/home/arnie", "group_create":true}'|& tee /tmp/midclt.out 
+  'uid'
+  Traceback (most recent call last):
+    File "/usr/local/lib/python3.9/site-packages/middlewared/plugins/account.py", line 319, in do_create
+      os.makedirs(data['home'], mode=int(home_mode, 8))
+    File "/usr/local/lib/python3.9/os.py", line 225, in makedirs
+      mkdir(name, mode)
+  FileExistsError: [Errno 17] File exists: '/mnt/pool0/home/arnie'
+
+  During handling of the above exception, another exception occurred:
+
+  Traceback (most recent call last):
+    File "/usr/local/lib/python3.9/site-packages/middlewared/main.py", line 139, in call_method
+      result = await self.middleware._call(message['method'], serviceobj, methodobj, params, app=self)
+    File "/usr/local/lib/python3.9/site-packages/middlewared/main.py", line 1235, in _call
+      return await methodobj(*prepared_call.args)
+    File "/usr/local/lib/python3.9/site-packages/middlewared/service.py", line 495, in create
+      rv = await self.middleware._call(
+    File "/usr/local/lib/python3.9/site-packages/middlewared/main.py", line 1235, in _call
+      return await methodobj(*prepared_call.args)
+    File "/usr/local/lib/python3.9/site-packages/middlewared/schema.py", line 975, in nf
+      return await f(*args, **kwargs)
+    File "/usr/local/lib/python3.9/site-packages/middlewared/plugins/account.py", line 339, in do_create
+      'uid': data['uid'],
+  KeyError: 'uid'
+#+end_src
+
+[2023-06-01 Thu] They won't fix it. So work around it.
+
+
+* DONE Long-running commands
+CLOSED: [2023-07-04 Tue 15:47]
+:PROPERTIES:
+:ARCHIVE_TIME: 2023-07-17 Mon 10:00
+:ARCHIVE_FILE: ~/proj/ansible/collections/truenas/TODO.org
+:ARCHIVE_CATEGORY: TODO
+:ARCHIVE_TODO: DONE
+:END:
+A number of API commands in the [[https://luggage.lan/api/docs/][reference]] are marekd as "Job". I believe that's because they take a long time to complete, and run asynchronously.
+
+The documentation at the bottom about Websocket Events says that you can subscribe to events (how?) and wait for them to complete. I suspect that =midclt waitready= does something similar, waiting for the next event to complete.
+
+According to TFS (=/usr/local/lib/python3.9/site-packages/middlewared/client/client.py=) =waitready=,
+#+begin_quote
+This command is supposed to wait until we are able to connect
+to middleware and perform a simple operation (core.ping)
+
+Reason behind this is because middlewared starts and we have to
+wait the boot process until it is ready to serve connections
+#+end_quote
+
+
+* DONE Middleware jobs
+CLOSED: [2023-07-04 Tue 15:47]
+:PROPERTIES:
+:ARCHIVE_TIME: 2023-07-17 Mon 10:00
+:ARCHIVE_FILE: ~/proj/ansible/collections/truenas/TODO.org
+:ARCHIVE_CATEGORY: TODO
+:ARCHIVE_TODO: DONE
+:END:
+Useful documentation about middleware jobs:
+https://github.com/truenas/middleware/blob/master/docs/source/middleware/jobs.rst
+
+Jobs are processes that might take a long time to complete. If you run one from the command line with ~midclt~, you get a numeric job ID instead of, say, a status object.
+
+On the command line, you can run
+: midclt call -job <function> <args>
+and it'll show a progress bar and wait for the job to compete. +I don't see a way to turn off the progress bar (which obviously isn't valid JSON). And in any case, this doesn't help the more general case, where an operation could take hours (like resilvering a disk).+
+
+: midclt call -job -jp description <function> <args>
+to turn off the progress bar.
+
+I think maybe the way to deal with this is to call
+: core.get_jobs [["id","=",12345]]
+
+and check the ~state~ field. Should be one of
+- WAITING
+- RUNNING
+- SUCCESS
+- FAILED
+- ABORTED
+
+Or maybe
+
+How do other long-running Ansible jobs do it?
+
+Asynchronous actions:
+https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_async.html
+
+So I think the Correct Answer is, just write a synchronous module.
+
+
+* DONE sharing_nfs API change
+CLOSED: [2023-06-09 Fri 17:52]
+:PROPERTIES:
+:ARCHIVE_TIME: 2023-07-17 Mon 10:00
+:ARCHIVE_FILE: ~/proj/ansible/collections/truenas/TODO.org
+:ARCHIVE_CATEGORY: TODO
+:ARCHIVE_TODO: DONE
+:END:
+Pull request:
+https://github.com/arensb/ansible-truenas/pull/1
+
+middlewared has changed: ~sharing_nfs~ now takes ~path~, not ~paths~.
+
+This appeared in https://github.com/truenas/middleware/commit/558ea76887b99134f16b11914671b31e3847def4
+which is TrueNAS SCALE 22.12.2 . It's not in TrueNAS CORE (as of TN-13.0-U5), and who knows when it'll be added.
+
+So the only sensible thing to do is to support both versions.
+
+~midclt call system.version~ returns
+: TrueNAS-13.0-U5
+For TrueNAS SCALE, I'm not sure what it returns.
+
+First, figure out which version we're running:
+- TrueNAS SCALE < 22.12.2 →plural ~paths~
+- TrueNAS SCALE >= 22.12.2 →singular ~path~
+- TrueNAS CORE < X →plural ~paths~
+- TrueNAS CORE >= X →singular ~path~
+
+where X is some unknown future version.
+
+Second, if the caller has ~paths~ (plural) but the list is of length 1, we can just print a message about how this is deprecated, and use ~path~ instead.
+
+If the list is of length >1, maybe we can treat that as a "for each path, do...".
+
+Third, what if the existing ~/etc/exports~ has a line with multiple filesystems?
+
+Having only one path allows us to use it as an identifier, rather than relying on the comment.
+
+----------------------------------------
+
+- If you're on a new-style system:
+  - If playbook has ~paths~:
+    - Abort with an error.
+  - else, playbook has ~path~:
+    - If ~/etc/export~ has multiple paths:
+      - Can't happen; or if it does, it's not my problem.
+    - else, ~/etc/export~ only one path per line:
+      - All is well.
+- else, you're on old-style system:
+  - If playbook has ~paths~:
+    - If ~paths~ has only one element:
+    - else, if ~paths~ has multiple elements:
+  - else, playbook has ~path~:
+

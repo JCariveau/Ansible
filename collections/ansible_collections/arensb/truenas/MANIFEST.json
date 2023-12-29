@@ -1,0 +1,33 @@
+{
+ "collection_info": {
+  "namespace": "arensb",
+  "name": "truenas",
+  "version": "1.8.0",
+  "authors": [
+   "Andrew Arensburger (https://ooblick.com/)",
+   "Ed Hull (https://github.com/edhull)"
+  ],
+  "readme": "README.md",
+  "tags": [
+   "truenas"
+  ],
+  "description": "Manage a TrueNAS host",
+  "license": [
+   "Apache-2.0"
+  ],
+  "license_file": null,
+  "dependencies": {},
+  "repository": "https://github.com/arensb/ansible-truenas",
+  "documentation": "https://arensb.github.io/truenas/index.html",
+  "homepage": null,
+  "issues": "https://github.com/arensb/ansible-truenas/issues"
+ },
+ "file_manifest_file": {
+  "name": "FILES.json",
+  "ftype": "file",
+  "chksum_type": "sha256",
+  "chksum_sha256": "cedef54c2b8fb72671503bc2da0f0952c558dee0f40b8b4ad2ef54bde347ab46",
+  "format": 1
+ },
+ "format": 1
+}
